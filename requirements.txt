@@ -1,0 +1,6 @@
+# No external dependencies required!
+# This project uses only Python standard library.
+
+# For development/testing (optional):
+# pytest>=7.0.0
+# coverage>=6.0
