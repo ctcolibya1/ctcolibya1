@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "خزنة البنية",
+    "slug": "InfraVault",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "infravault",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.infravault.app",
+      "infoPlist": {
+        "NSFaceIDUsageDescription": "لفتح خزنة بيانات الدخول بأمان",
+        "CFBundleAllowMixedLocalizations": true,
+        "CFBundleDevelopmentRegion": "ar",
+        "LSApplicationQueriesSchemes": ["whatsapp", "whatsapp-messenger"]
+      }
+    },
+    "android": {
+      "package": "com.infravault.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1220",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-local-authentication"
+    ],
+    "locales": {
+      "ar": "./locales/ar.json"
+    }
+  }
+}
