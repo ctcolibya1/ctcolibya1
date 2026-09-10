@@ -4,12 +4,18 @@ import { Credential } from '../types';
 import { ar } from '../i18n/ar';
 
 export async function canUseBiometrics(): Promise<boolean> {
-  const hasHardware = await LocalAuthentication.hasHardwareAsync();
-  const enrolled = await LocalAuthentication.isEnrolledAsync();
-  return hasHardware && enrolled;
+  if (Platform.OS === 'web') return false;
+  try {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const enrolled = await LocalAuthentication.isEnrolledAsync();
+    return hasHardware && enrolled;
+  } catch {
+    return false;
+  }
 }
 
 export async function authenticateWithBiometrics(): Promise<boolean> {
+  if (Platform.OS === 'web') return false;
   const result = await LocalAuthentication.authenticateAsync({
     promptMessage: ar.useBiometrics,
     cancelLabel: ar.cancel,

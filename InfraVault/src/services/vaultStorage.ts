@@ -1,12 +1,38 @@
 import CryptoJS from 'crypto-js';
 import * as Crypto from 'expo-crypto';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Credential, VaultSettings } from '../types';
 
 const SETTINGS_KEY = 'infravault.settings';
 const VAULT_KEY = 'infravault.vault.enc';
 const SESSION_KEY = 'infravault.session';
+
+async function secureGet(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return AsyncStorage.getItem(`secure:${key}`);
+  }
+  const SecureStore = await import('expo-secure-store');
+  return SecureStore.getItemAsync(key);
+}
+
+async function secureSet(key: string, value: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.setItem(`secure:${key}`, value);
+    return;
+  }
+  const SecureStore = await import('expo-secure-store');
+  await SecureStore.setItemAsync(key, value);
+}
+
+async function secureDelete(key: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    await AsyncStorage.removeItem(`secure:${key}`);
+    return;
+  }
+  const SecureStore = await import('expo-secure-store');
+  await SecureStore.deleteItemAsync(key);
+}
 
 function deriveKey(pin: string, salt: string): string {
   return CryptoJS.PBKDF2(pin, salt, {
@@ -30,7 +56,7 @@ export async function createSalt(): Promise<string> {
 }
 
 export async function loadSettings(): Promise<VaultSettings | null> {
-  const raw = await SecureStore.getItemAsync(SETTINGS_KEY);
+  const raw = await secureGet(SETTINGS_KEY);
   if (!raw) return null;
   try {
     return JSON.parse(raw) as VaultSettings;
@@ -40,7 +66,7 @@ export async function loadSettings(): Promise<VaultSettings | null> {
 }
 
 export async function saveSettings(settings: VaultSettings): Promise<void> {
-  await SecureStore.setItemAsync(SETTINGS_KEY, JSON.stringify(settings));
+  await secureSet(SETTINGS_KEY, JSON.stringify(settings));
 }
 
 export async function setupVault(pin: string): Promise<VaultSettings> {
@@ -103,13 +129,13 @@ export async function saveCredentials(
 }
 
 export async function setSessionPin(pin: string): Promise<void> {
-  await SecureStore.setItemAsync(SESSION_KEY, pin);
+  await secureSet(SESSION_KEY, pin);
 }
 
 export async function getSessionPin(): Promise<string | null> {
-  return SecureStore.getItemAsync(SESSION_KEY);
+  return secureGet(SESSION_KEY);
 }
 
 export async function clearSession(): Promise<void> {
-  await SecureStore.deleteItemAsync(SESSION_KEY);
+  await secureDelete(SESSION_KEY);
 }
