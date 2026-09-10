@@ -62,7 +62,6 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
 
   const setup = useCallback(async (pin: string) => {
     const s = await vault.setupVault(pin);
-    await vault.setSessionPin(pin);
     setSettings(s);
     setSessionPinState(pin);
     setCredentials([]);
@@ -75,8 +74,12 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       const ok = await vault.verifyPin(pin, settings);
       if (!ok) return false;
       const list = await vault.loadCredentials(pin, settings.salt);
-      await vault.setSessionPin(pin);
       setSessionPinState(pin);
+      if (settings.biometricsEnabled) {
+        await vault.setSessionPin(pin);
+      } else {
+        await vault.clearSession();
+      }
       setCredentials(list);
       setUnlocked(true);
       return true;
@@ -97,7 +100,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
   const lock = useCallback(async () => {
     setUnlocked(false);
     setCredentials([]);
-    // Keep session PIN in SecureStore for biometric unlock
+    setSessionPinState(null);
   }, []);
 
   const addCredential = useCallback(
@@ -150,17 +153,26 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       const next = { ...settings, biometricsEnabled: enabled };
       await vault.saveSettings(next);
       setSettings(next);
+      if (enabled && sessionPin) {
+        await vault.setSessionPin(sessionPin);
+      } else if (!enabled) {
+        await vault.clearSession();
+      }
     },
-    [settings]
+    [settings, sessionPin]
   );
 
   const changePin = useCallback(
     async (oldPin: string, newPin: string) => {
       if (!settings) return;
       const next = await vault.changePin(oldPin, newPin, settings);
-      await vault.setSessionPin(newPin);
       setSettings(next);
       setSessionPinState(newPin);
+      if (next.biometricsEnabled) {
+        await vault.setSessionPin(newPin);
+      } else {
+        await vault.clearSession();
+      }
     },
     [settings]
   );

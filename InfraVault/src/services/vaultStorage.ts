@@ -42,10 +42,11 @@ function deriveKey(pin: string, salt: string): string {
 }
 
 export async function hashPin(pin: string, salt: string): Promise<string> {
-  return Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    `${salt}:${pin}`
-  );
+  // Slow hash for PIN verification (work factor), separate from AES key derivation.
+  return CryptoJS.PBKDF2(pin, `pin:${salt}`, {
+    keySize: 256 / 32,
+    iterations: 120000,
+  }).toString();
 }
 
 export async function createSalt(): Promise<string> {

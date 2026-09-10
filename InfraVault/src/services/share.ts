@@ -83,6 +83,14 @@ export function formatCredentialMessage(
 }
 
 export async function shareViaWhatsApp(message: string): Promise<void> {
+  // Prefer the system share sheet so secrets are not embedded in a URL.
+  try {
+    await Share.share({ message });
+    return;
+  } catch {
+    // fall through to WhatsApp deep link
+  }
+
   const encoded = encodeURIComponent(message);
   const appUrl = `whatsapp://send?text=${encoded}`;
   const webUrl = `https://wa.me/?text=${encoded}`;
@@ -97,11 +105,7 @@ export async function shareViaWhatsApp(message: string): Promise<void> {
     // fall through
   }
 
-  try {
-    await Linking.openURL(webUrl);
-  } catch {
-    await Share.share({ message });
-  }
+  await Linking.openURL(webUrl);
 }
 
 export async function shareSystem(message: string): Promise<void> {
