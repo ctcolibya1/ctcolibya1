@@ -1,7 +1,7 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import { Linking, Platform, Share } from 'react-native';
 import { Credential } from '../types';
-import { ar } from '../i18n/ar';
+import { ar, labelForField } from '../i18n/ar';
 
 export async function canUseBiometrics(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
@@ -26,55 +26,79 @@ export async function authenticateWithBiometrics(): Promise<boolean> {
 
 export type ShareField =
   | 'name'
+  | 'manufacturer'
+  | 'model'
+  | 'serialNumber'
+  | 'serviceTag'
+  | 'cpu'
+  | 'ram'
+  | 'storage'
+  | 'networkPorts'
+  | 'firmware'
+  | 'osOrSystems'
+  | 'location'
+  | 'rack'
+  | 'department'
+  | 'role'
+  | 'status'
+  | 'managementIp'
   | 'host'
   | 'port'
+  | 'protocol'
   | 'username'
   | 'password'
-  | 'protocol'
-  | 'osOrFirmware'
-  | 'location'
+  | 'purchaseDate'
+  | 'warrantyExpiry'
   | 'notes';
 
 export const ALL_SHARE_FIELDS: ShareField[] = [
   'name',
+  'manufacturer',
+  'model',
+  'serialNumber',
+  'serviceTag',
+  'cpu',
+  'ram',
+  'storage',
+  'networkPorts',
+  'firmware',
+  'osOrSystems',
+  'location',
+  'rack',
+  'department',
+  'role',
+  'status',
+  'managementIp',
   'host',
   'port',
+  'protocol',
   'username',
   'password',
-  'protocol',
-  'osOrFirmware',
-  'location',
+  'purchaseDate',
+  'warrantyExpiry',
   'notes',
 ];
+
+function fieldValue(credential: Credential, field: ShareField): string {
+  if (field === 'protocol') {
+    return ar.protocolLabels[credential.protocol];
+  }
+  if (field === 'status') {
+    return ar.statusLabels[credential.status];
+  }
+  return String(credential[field] ?? '').trim();
+}
 
 export function formatCredentialMessage(
   credential: Credential,
   fields: ShareField[] = ALL_SHARE_FIELDS
 ): string {
   const lines: string[] = [`🔐 ${ar.appName}`, ''];
-  const map: Record<ShareField, string | undefined> = {
-    name: `${ar.name}: ${credential.name}`,
-    host: credential.host ? `${ar.host}: ${credential.host}` : undefined,
-    port: credential.port ? `${ar.port}: ${credential.port}` : undefined,
-    username: credential.username
-      ? `${ar.username}: ${credential.username}`
-      : undefined,
-    password: credential.password
-      ? `${ar.password}: ${credential.password}`
-      : undefined,
-    protocol: `${ar.protocol}: ${ar.protocolLabels[credential.protocol]}`,
-    osOrFirmware: credential.osOrFirmware
-      ? `${ar.osOrFirmware}: ${credential.osOrFirmware}`
-      : undefined,
-    location: credential.location
-      ? `${ar.location}: ${credential.location}`
-      : undefined,
-    notes: credential.notes ? `${ar.notes}: ${credential.notes}` : undefined,
-  };
 
   for (const field of fields) {
-    const line = map[field];
-    if (line) lines.push(line);
+    const value = fieldValue(credential, field);
+    if (!value) continue;
+    lines.push(`${labelForField(field)}: ${value}`);
   }
 
   lines.push('');

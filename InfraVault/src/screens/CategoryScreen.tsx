@@ -56,7 +56,10 @@ export function CategoryScreen({ navigation, route }: Props) {
               <View style={{ flex: 1 }}>
                 <Text style={styles.name}>{item.name}</Text>
                 <Text style={styles.meta}>
-                  {[item.host, item.username].filter(Boolean).join(' · ') ||
+                  {[item.model, item.serialNumber, item.manufacturer]
+                    .filter(Boolean)
+                    .join(' · ') ||
+                    [item.host, item.username].filter(Boolean).join(' · ') ||
                     ar.protocolLabels[item.protocol]}
                 </Text>
               </View>

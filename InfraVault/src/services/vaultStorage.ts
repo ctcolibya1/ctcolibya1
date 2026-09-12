@@ -2,7 +2,7 @@ import CryptoJS from 'crypto-js';
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Credential, VaultSettings } from '../types';
+import { Asset, Credential, VaultSettings, normalizeAsset } from '../types';
 
 const SETTINGS_KEY = 'infravault.settings';
 const VAULT_KEY = 'infravault.vault.enc';
@@ -56,11 +56,40 @@ export async function createSalt(): Promise<string> {
     .join('');
 }
 
+function normalizeSettings(raw: Record<string, unknown>): VaultSettings | null {
+  const pinHash =
+    (typeof raw.pinHash === 'string' && raw.pinHash) ||
+    (typeof raw.pin_hash === 'string' && raw.pin_hash) ||
+    (typeof raw.hash === 'string' && raw.hash) ||
+    '';
+  const salt =
+    (typeof raw.salt === 'string' && raw.salt) ||
+    (typeof raw.pinSalt === 'string' && raw.pinSalt) ||
+    '';
+  if (!pinHash || !salt) return null;
+  return {
+    pinHash,
+    salt,
+    biometricsEnabled: !!(
+      raw.biometricsEnabled ??
+      raw.biometrics_enabled ??
+      false
+    ),
+    autoLockMinutes:
+      typeof raw.autoLockMinutes === 'number'
+        ? raw.autoLockMinutes
+        : typeof raw.auto_lock_minutes === 'number'
+          ? raw.auto_lock_minutes
+          : 5,
+  };
+}
+
 export async function loadSettings(): Promise<VaultSettings | null> {
   const raw = await secureGet(SETTINGS_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as VaultSettings;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return normalizeSettings(parsed);
   } catch {
     return null;
   }
@@ -105,7 +134,7 @@ export async function changePin(
   return next;
 }
 
-export async function loadCredentials(pin: string, salt: string): Promise<Credential[]> {
+export async function loadCredentials(pin: string, salt: string): Promise<Asset[]> {
   const enc = await AsyncStorage.getItem(VAULT_KEY);
   if (!enc) return [];
   try {
@@ -113,7 +142,14 @@ export async function loadCredentials(pin: string, salt: string): Promise<Creden
     const bytes = CryptoJS.AES.decrypt(enc, key);
     const json = bytes.toString(CryptoJS.enc.Utf8);
     if (!json) throw new Error('DECRYPT_FAILED');
-    return JSON.parse(json) as Credential[];
+    const parsed = JSON.parse(json) as Partial<Asset>[];
+    return parsed.map((item) =>
+      normalizeAsset({
+        ...(item as Partial<Asset>),
+        id: item.id || `c_${Date.now()}`,
+        category: item.category || 'servers',
+      })
+    );
   } catch {
     throw new Error('DECRYPT_FAILED');
   }

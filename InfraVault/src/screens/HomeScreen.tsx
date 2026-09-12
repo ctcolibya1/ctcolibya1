@@ -39,7 +39,19 @@ export function HomeScreen({ navigation }: Props) {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return credentials.filter((c) =>
-      [c.name, c.host, c.username, c.location, c.notes]
+      [
+        c.name,
+        c.manufacturer,
+        c.model,
+        c.serialNumber,
+        c.serviceTag,
+        c.managementIp,
+        c.host,
+        c.role,
+        c.username,
+        c.location,
+        c.notes,
+      ]
         .join(' ')
         .toLowerCase()
         .includes(q)
@@ -62,6 +74,13 @@ export function HomeScreen({ navigation }: Props) {
               <Text style={styles.headerAction}>قفل</Text>
             </Pressable>
           </View>
+
+          <Pressable
+            style={styles.reportBtn}
+            onPress={() => navigation.navigate('Report')}
+          >
+            <Text style={styles.reportBtnText}>{ar.report}</Text>
+          </Pressable>
 
           <TextInput
             value={query}
@@ -167,6 +186,22 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 14,
     fontWeight: '600',
+  },
+  reportBtn: {
+    alignSelf: 'stretch',
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.accentDim,
+    borderRadius: radii.md,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    marginBottom: spacing.sm,
+    alignItems: 'center',
+  },
+  reportBtnText: {
+    color: colors.accent,
+    fontWeight: '700',
+    fontSize: 14,
   },
   search: {
     backgroundColor: colors.bgElevated,

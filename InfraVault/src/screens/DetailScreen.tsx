@@ -13,8 +13,8 @@ import * as Clipboard from 'expo-clipboard';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../context/VaultContext';
-import { ar } from '../i18n/ar';
-import { RootStackParamList } from '../types';
+import { ar, labelForField } from '../i18n/ar';
+import { Asset, RootStackParamList } from '../types';
 import {
   ALL_SHARE_FIELDS,
   ShareField,
@@ -26,17 +26,89 @@ import { GhostButton, PrimaryButton, Screen } from '../components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Detail'>;
 
-const FIELD_LABELS: Record<ShareField, string> = {
-  name: ar.name,
-  host: ar.host,
-  port: ar.port,
-  username: ar.username,
-  password: ar.password,
-  protocol: ar.protocol,
-  osOrFirmware: ar.osOrFirmware,
-  location: ar.location,
-  notes: ar.notes,
+type DetailRow = {
+  field: keyof Asset;
+  label: string;
+  value: string;
+  section: string;
+  isPassword?: boolean;
 };
+
+function sectionOf(field: keyof Asset): string {
+  if (
+    ['name', 'manufacturer', 'model', 'serialNumber', 'serviceTag'].includes(
+      field
+    )
+  ) {
+    return ar.sectionIdentity;
+  }
+  if (
+    [
+      'cpu',
+      'ram',
+      'storage',
+      'networkPorts',
+      'firmware',
+      'osOrSystems',
+    ].includes(field)
+  ) {
+    return ar.sectionSpecs;
+  }
+  if (['location', 'rack', 'department', 'role', 'status'].includes(field)) {
+    return ar.sectionOps;
+  }
+  if (
+    [
+      'managementIp',
+      'host',
+      'port',
+      'protocol',
+      'username',
+      'password',
+    ].includes(field)
+  ) {
+    return ar.sectionAccess;
+  }
+  return ar.sectionLifecycle;
+}
+
+const DETAIL_FIELDS: (keyof Asset)[] = [
+  'name',
+  'manufacturer',
+  'model',
+  'serialNumber',
+  'serviceTag',
+  'cpu',
+  'ram',
+  'storage',
+  'networkPorts',
+  'firmware',
+  'osOrSystems',
+  'location',
+  'rack',
+  'department',
+  'role',
+  'status',
+  'managementIp',
+  'host',
+  'port',
+  'protocol',
+  'username',
+  'password',
+  'purchaseDate',
+  'warrantyExpiry',
+  'notes',
+];
+
+function displayValue(item: Asset, field: keyof Asset, showPassword: boolean): string {
+  if (field === 'protocol') return ar.protocolLabels[item.protocol];
+  if (field === 'status') return ar.statusLabels[item.status];
+  if (field === 'password') {
+    if (!item.password) return '';
+    return showPassword ? item.password : '••••••••';
+  }
+  return String(item[field] ?? '').trim();
+}
 
 export function DetailScreen({ navigation, route }: Props) {
   const { id } = route.params;
@@ -52,26 +124,21 @@ export function DetailScreen({ navigation, route }: Props) {
       >
   );
 
-  const rows = useMemo(() => {
+  const rows = useMemo((): DetailRow[] => {
     if (!item) return [];
-    return [
-      { label: ar.host, value: item.host },
-      { label: ar.port, value: item.port },
-      { label: ar.username, value: item.username },
-      {
-        label: ar.password,
-        value: item.password
-          ? showPassword
-            ? item.password
-            : '••••••••'
-          : '',
-        isPassword: true as const,
-      },
-      { label: ar.protocol, value: ar.protocolLabels[item.protocol] },
-      { label: ar.osOrFirmware, value: item.osOrFirmware },
-      { label: ar.location, value: item.location },
-      { label: ar.notes, value: item.notes },
-    ].filter((r) => !!r.value);
+    const out: DetailRow[] = [];
+    for (const field of DETAIL_FIELDS) {
+      const value = displayValue(item, field, showPassword);
+      if (!value) continue;
+      out.push({
+        field,
+        label: labelForField(field),
+        value,
+        section: sectionOf(field),
+        isPassword: field === 'password',
+      });
+    }
+    return out;
   }, [item, showPassword]);
 
   if (!item) {
@@ -106,6 +173,8 @@ export function DetailScreen({ navigation, route }: Props) {
     await shareViaWhatsApp(message);
   };
 
+  let lastSection = '';
+
   return (
     <Screen style={{ paddingHorizontal: 0 }}>
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -127,32 +196,41 @@ export function DetailScreen({ navigation, route }: Props) {
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.badge}>{ar.categoryLabels[item.category]}</Text>
 
-          {rows.map((row) => (
-            <View key={row.label} style={styles.row}>
-              <View style={styles.rowHead}>
-                <Text style={styles.label}>{row.label}</Text>
-                {'isPassword' in row && row.isPassword && (
-                  <Pressable onPress={() => setShowPassword((v) => !v)}>
-                    <Text style={styles.link}>
-                      {showPassword ? ar.hidePassword : ar.showPassword}
-                    </Text>
+          {rows.map((row) => {
+            const showSection = row.section !== lastSection;
+            lastSection = row.section;
+            return (
+              <View key={String(row.field)}>
+                {showSection ? (
+                  <Text style={styles.section}>{row.section}</Text>
+                ) : null}
+                <View style={styles.row}>
+                  <View style={styles.rowHead}>
+                    <Text style={styles.label}>{row.label}</Text>
+                    {row.isPassword && (
+                      <Pressable onPress={() => setShowPassword((v) => !v)}>
+                        <Text style={styles.link}>
+                          {showPassword ? ar.hidePassword : ar.showPassword}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                  <Pressable
+                    onLongPress={async () => {
+                      if (row.isPassword) {
+                        await Clipboard.setStringAsync(item.password);
+                      } else {
+                        await Clipboard.setStringAsync(String(row.value));
+                      }
+                      Alert.alert('', ar.copied);
+                    }}
+                  >
+                    <Text style={styles.value}>{row.value}</Text>
                   </Pressable>
-                )}
+                </View>
               </View>
-              <Pressable
-                onLongPress={async () => {
-                  if ('isPassword' in row && row.isPassword) {
-                    await Clipboard.setStringAsync(item.password);
-                  } else {
-                    await Clipboard.setStringAsync(String(row.value));
-                  }
-                  Alert.alert('', ar.copied);
-                }}
-              >
-                <Text style={styles.value}>{row.value}</Text>
-              </Pressable>
-            </View>
-          ))}
+            );
+          })}
 
           <View style={styles.actions}>
             <PrimaryButton
@@ -174,22 +252,30 @@ export function DetailScreen({ navigation, route }: Props) {
           <View style={styles.modalOverlay}>
             <View style={styles.modal}>
               <Text style={styles.modalTitle}>{ar.selectFieldsToShare}</Text>
-              {ALL_SHARE_FIELDS.map((field) => (
-                <View key={field} style={styles.switchRow}>
-                  <Switch
-                    value={fields[field]}
-                    onValueChange={(v) =>
-                      setFields((prev) => ({ ...prev, [field]: v }))
-                    }
-                    trackColor={{ true: colors.accentDim, false: colors.border }}
-                    thumbColor={fields[field] ? colors.accent : colors.textDim}
-                  />
-                  <Text style={styles.switchLabel}>{FIELD_LABELS[field]}</Text>
-                </View>
-              ))}
+              <ScrollView style={{ maxHeight: 360 }}>
+                {ALL_SHARE_FIELDS.map((field) => (
+                  <View key={field} style={styles.switchRow}>
+                    <Switch
+                      value={fields[field]}
+                      onValueChange={(v) =>
+                        setFields((prev) => ({ ...prev, [field]: v }))
+                      }
+                      trackColor={{
+                        true: colors.accentDim,
+                        false: colors.border,
+                      }}
+                      thumbColor={fields[field] ? colors.accent : colors.textDim}
+                    />
+                    <Text style={styles.switchLabel}>{labelForField(field)}</Text>
+                  </View>
+                ))}
+              </ScrollView>
               <View style={{ gap: 10, marginTop: 12 }}>
                 <PrimaryButton label={ar.shareWhatsApp} onPress={onShare} />
-                <GhostButton label={ar.cancel} onPress={() => setShareOpen(false)} />
+                <GhostButton
+                  label={ar.cancel}
+                  onPress={() => setShareOpen(false)}
+                />
               </View>
             </View>
           </View>
@@ -228,7 +314,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radii.sm,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    fontWeight: '700',
+  },
+  section: {
+    color: colors.accent,
+    textAlign: 'right',
+    marginTop: spacing.md,
+    marginBottom: 8,
+    fontSize: 14,
     fontWeight: '700',
   },
   row: {
@@ -269,6 +363,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    maxHeight: '90%',
   },
   modalTitle: {
     color: colors.text,
@@ -283,5 +378,5 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
   },
-  switchLabel: { color: colors.text, fontSize: 15 },
+  switchLabel: { color: colors.text, fontSize: 15, flex: 1, textAlign: 'right' },
 });

@@ -10,75 +10,154 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../context/VaultContext';
-import { ar, PROTOCOL_ORDER } from '../i18n/ar';
-import { Protocol, RootStackParamList } from '../types';
+import {
+  ar,
+  fieldsForCategory,
+  labelForField,
+  PROTOCOL_ORDER,
+  STATUS_ORDER,
+} from '../i18n/ar';
+import {
+  Asset,
+  AssetStatus,
+  EMPTY_ASSET_FIELDS,
+  MANUFACTURERS,
+  RootStackParamList,
+} from '../types';
 import { colors, radii, spacing } from '../theme';
 import { Field, GhostButton, PrimaryButton, Screen } from '../components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Form'>;
+type FormData = Omit<Asset, 'id' | 'createdAt' | 'updatedAt'>;
+
+function sectionOf(field: keyof Asset): string {
+  if (
+    ['name', 'manufacturer', 'model', 'serialNumber', 'serviceTag'].includes(
+      field
+    )
+  ) {
+    return ar.sectionIdentity;
+  }
+  if (
+    [
+      'cpu',
+      'ram',
+      'storage',
+      'networkPorts',
+      'firmware',
+      'osOrSystems',
+    ].includes(field)
+  ) {
+    return ar.sectionSpecs;
+  }
+  if (['location', 'rack', 'department', 'role', 'status'].includes(field)) {
+    return ar.sectionOps;
+  }
+  if (
+    [
+      'managementIp',
+      'host',
+      'port',
+      'protocol',
+      'username',
+      'password',
+    ].includes(field)
+  ) {
+    return ar.sectionAccess;
+  }
+  return ar.sectionLifecycle;
+}
 
 export function FormScreen({ navigation, route }: Props) {
   const { id, category: initialCategory } = route.params;
   const { getById, addCredential, updateCredential } = useVault();
   const existing = id ? getById(id) : undefined;
-
-  const [name, setName] = useState(existing?.name ?? '');
-  const [host, setHost] = useState(existing?.host ?? '');
-  const [port, setPort] = useState(existing?.port ?? '');
-  const [username, setUsername] = useState(existing?.username ?? '');
-  const [password, setPassword] = useState(existing?.password ?? '');
-  const [protocol, setProtocol] = useState<Protocol>(existing?.protocol ?? 'ssh');
-  const [osOrFirmware, setOsOrFirmware] = useState(existing?.osOrFirmware ?? '');
-  const [location, setLocation] = useState(existing?.location ?? '');
-  const [notes, setNotes] = useState(existing?.notes ?? '');
-  const [busy, setBusy] = useState(false);
-
   const category = existing?.category ?? initialCategory ?? 'servers';
 
-  const title = useMemo(
-    () => (existing ? ar.editEntry : ar.newEntry),
-    [existing]
-  );
+  const [form, setForm] = useState<FormData>({
+    ...EMPTY_ASSET_FIELDS,
+    category,
+    protocol: existing?.protocol ?? 'ssh',
+    status: existing?.status ?? 'active',
+    name: existing?.name ?? '',
+    manufacturer: existing?.manufacturer ?? '',
+    model: existing?.model ?? '',
+    serialNumber: existing?.serialNumber ?? '',
+    serviceTag: existing?.serviceTag ?? '',
+    cpu: existing?.cpu ?? '',
+    ram: existing?.ram ?? '',
+    storage: existing?.storage ?? '',
+    networkPorts: existing?.networkPorts ?? '',
+    firmware: existing?.firmware ?? '',
+    osOrSystems: existing?.osOrSystems ?? '',
+    location: existing?.location ?? '',
+    rack: existing?.rack ?? '',
+    department: existing?.department ?? '',
+    role: existing?.role ?? '',
+    managementIp: existing?.managementIp ?? '',
+    host: existing?.host ?? '',
+    port: existing?.port ?? '',
+    username: existing?.username ?? '',
+    password: existing?.password ?? '',
+    purchaseDate: existing?.purchaseDate ?? '',
+    warrantyExpiry: existing?.warrantyExpiry ?? '',
+    notes: existing?.notes ?? '',
+  });
+  const [busy, setBusy] = useState(false);
+
+  const visibleFields = useMemo(() => fieldsForCategory(category), [category]);
+  const knownMfr = MANUFACTURERS.filter((m) => m !== 'Other');
+
+  const patch = <K extends keyof FormData>(key: K, value: FormData[K]) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
 
   const onSave = async () => {
-    if (!name.trim()) {
+    if (!form.name.trim()) {
       Alert.alert('', ar.required);
       return;
     }
     setBusy(true);
     try {
+      const payload: FormData = {
+        ...form,
+        category,
+        name: form.name.trim(),
+        manufacturer: form.manufacturer.trim(),
+        model: form.model.trim(),
+        serialNumber: form.serialNumber.trim(),
+        serviceTag: form.serviceTag.trim(),
+        cpu: form.cpu.trim(),
+        ram: form.ram.trim(),
+        storage: form.storage.trim(),
+        networkPorts: form.networkPorts.trim(),
+        firmware: form.firmware.trim(),
+        osOrSystems: form.osOrSystems.trim(),
+        location: form.location.trim(),
+        rack: form.rack.trim(),
+        department: form.department.trim(),
+        role: form.role.trim(),
+        managementIp: form.managementIp.trim(),
+        host: form.host.trim(),
+        port: form.port.trim(),
+        username: form.username.trim(),
+        purchaseDate: form.purchaseDate.trim(),
+        warrantyExpiry: form.warrantyExpiry.trim(),
+        notes: form.notes.trim(),
+      };
       if (existing) {
-        await updateCredential(existing.id, {
-          name: name.trim(),
-          host: host.trim(),
-          port: port.trim(),
-          username: username.trim(),
-          password,
-          protocol,
-          osOrFirmware: osOrFirmware.trim(),
-          location: location.trim(),
-          notes: notes.trim(),
-        });
+        await updateCredential(existing.id, payload);
         navigation.goBack();
       } else {
-        const item = await addCredential({
-          category,
-          name: name.trim(),
-          host: host.trim(),
-          port: port.trim(),
-          username: username.trim(),
-          password,
-          protocol,
-          osOrFirmware: osOrFirmware.trim(),
-          location: location.trim(),
-          notes: notes.trim(),
-        });
+        const item = await addCredential(payload);
         navigation.replace('Detail', { id: item.id });
       }
     } finally {
       setBusy(false);
     }
   };
+
+  let lastSection = '';
 
   return (
     <Screen style={{ paddingHorizontal: 0 }}>
@@ -87,7 +166,9 @@ export function FormScreen({ navigation, route }: Props) {
           <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
             <Text style={styles.link}>{ar.cancel}</Text>
           </Pressable>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.title}>
+            {existing ? ar.editEntry : ar.newEntry}
+          </Text>
           <Text style={styles.cat}>{ar.categoryLabels[category]}</Text>
         </View>
 
@@ -95,77 +176,164 @@ export function FormScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.form}
           keyboardShouldPersistTaps="handled"
         >
-          <Field label={ar.name} value={name} onChangeText={setName} />
-          <Field
-            label={ar.host}
-            value={host}
-            onChangeText={setHost}
-            autoCapitalize="none"
-            keyboardType="url"
-          />
-          <Field
-            label={ar.port}
-            value={port}
-            onChangeText={setPort}
-            keyboardType="number-pad"
-          />
-          <Field
-            label={ar.username}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Field
-            label={ar.password}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          {visibleFields.map((field) => {
+            const section = sectionOf(field);
+            const showSection = section !== lastSection;
+            lastSection = section;
 
-          <Text style={styles.section}>{ar.protocol}</Text>
-          <View style={styles.chips}>
-            {PROTOCOL_ORDER.map((p) => (
-              <Pressable
-                key={p}
-                onPress={() => setProtocol(p)}
-                style={[styles.chip, protocol === p && styles.chipActive]}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    protocol === p && styles.chipTextActive,
-                  ]}
-                >
-                  {ar.protocolLabels[p]}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+            if (field === 'manufacturer') {
+              const isCustom =
+                !!form.manufacturer && !knownMfr.includes(form.manufacturer as typeof knownMfr[number]);
+              return (
+                <View key={field}>
+                  {showSection ? (
+                    <Text style={styles.section}>{section}</Text>
+                  ) : null}
+                  <Text style={styles.fieldLabel}>{ar.manufacturer}</Text>
+                  <View style={styles.chips}>
+                    {MANUFACTURERS.map((m) => {
+                      const active =
+                        m === 'Other'
+                          ? !form.manufacturer || isCustom
+                          : form.manufacturer === m;
+                      return (
+                        <Pressable
+                          key={m}
+                          onPress={() =>
+                            patch('manufacturer', m === 'Other' ? '' : m)
+                          }
+                          style={[styles.chip, active && styles.chipActive]}
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              active && styles.chipTextActive,
+                            ]}
+                          >
+                            {m}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {(!form.manufacturer || isCustom) && (
+                    <Field
+                      label="مصنّع آخر"
+                      value={isCustom ? form.manufacturer : ''}
+                      onChangeText={(v) => patch('manufacturer', v)}
+                    />
+                  )}
+                </View>
+              );
+            }
 
-          <Field
-            label={ar.osOrFirmware}
-            value={osOrFirmware}
-            onChangeText={setOsOrFirmware}
-          />
-          <Field
-            label={ar.location}
-            value={location}
-            onChangeText={setLocation}
-          />
-          <Field
-            label={ar.notes}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            style={{ minHeight: 90, textAlignVertical: 'top' }}
-          />
+            if (field === 'protocol') {
+              return (
+                <View key={field}>
+                  {showSection ? (
+                    <Text style={styles.section}>{section}</Text>
+                  ) : null}
+                  <Text style={styles.fieldLabel}>{ar.protocol}</Text>
+                  <View style={styles.chips}>
+                    {PROTOCOL_ORDER.map((p) => (
+                      <Pressable
+                        key={p}
+                        onPress={() => patch('protocol', p)}
+                        style={[
+                          styles.chip,
+                          form.protocol === p && styles.chipActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            form.protocol === p && styles.chipTextActive,
+                          ]}
+                        >
+                          {ar.protocolLabels[p]}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              );
+            }
+
+            if (field === 'status') {
+              return (
+                <View key={field}>
+                  {showSection ? (
+                    <Text style={styles.section}>{section}</Text>
+                  ) : null}
+                  <Text style={styles.fieldLabel}>{ar.status}</Text>
+                  <View style={styles.chips}>
+                    {STATUS_ORDER.map((s) => (
+                      <Pressable
+                        key={s}
+                        onPress={() => patch('status', s as AssetStatus)}
+                        style={[
+                          styles.chip,
+                          form.status === s && styles.chipActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            form.status === s && styles.chipTextActive,
+                          ]}
+                        >
+                          {ar.statusLabels[s]}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              );
+            }
+
+            const multiline = field === 'notes' || field === 'osOrSystems';
+            const formKey = field as keyof FormData;
+            return (
+              <View key={field}>
+                {showSection ? (
+                  <Text style={styles.section}>{section}</Text>
+                ) : null}
+                <Field
+                  label={labelForField(field)}
+                  value={String(form[formKey] ?? '')}
+                  onChangeText={(v) => patch(formKey, v as never)}
+                  secureTextEntry={field === 'password'}
+                  autoCapitalize={
+                    ['host', 'managementIp', 'username', 'password'].includes(
+                      field
+                    )
+                      ? 'none'
+                      : 'sentences'
+                  }
+                  keyboardType={
+                    field === 'port'
+                      ? 'number-pad'
+                      : field === 'host' || field === 'managementIp'
+                        ? 'url'
+                        : 'default'
+                  }
+                  multiline={multiline}
+                  style={
+                    multiline
+                      ? { minHeight: 90, textAlignVertical: 'top' }
+                      : undefined
+                  }
+                />
+              </View>
+            );
+          })}
 
           <View style={{ gap: 10, marginTop: spacing.md }}>
             <PrimaryButton label={ar.save} onPress={onSave} disabled={busy} />
-            <GhostButton label={ar.cancel} onPress={() => navigation.goBack()} />
+            <GhostButton
+              label={ar.cancel}
+              onPress={() => navigation.goBack()}
+            />
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -196,9 +364,17 @@ const styles = StyleSheet.create({
   link: { color: colors.accent, fontWeight: '600' },
   form: { padding: spacing.md, paddingBottom: 48 },
   section: {
-    color: colors.textMuted,
+    color: colors.accent,
     textAlign: 'right',
-    marginBottom: 8,
+    marginTop: spacing.md,
+    marginBottom: 10,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  fieldLabel: {
+    color: colors.textMuted,
+    marginBottom: 6,
+    textAlign: 'right',
     fontSize: 13,
   },
   chips: {

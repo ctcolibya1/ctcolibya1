@@ -13,6 +13,7 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { CategoryScreen } from './src/screens/CategoryScreen';
 import { DetailScreen } from './src/screens/DetailScreen';
 import { FormScreen } from './src/screens/FormScreen';
+import { ReportScreen } from './src/screens/ReportScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 
 try {
@@ -59,6 +60,7 @@ function RootNavigator() {
           <Stack.Screen name="Category" component={CategoryScreen} />
           <Stack.Screen name="Detail" component={DetailScreen} />
           <Stack.Screen name="Form" component={FormScreen} />
+          <Stack.Screen name="Report" component={ReportScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
         </>
       )}
