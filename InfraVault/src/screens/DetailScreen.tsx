@@ -13,8 +13,8 @@ import * as Clipboard from 'expo-clipboard';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../context/VaultContext';
-import { ar, labelForField } from '../i18n/ar';
-import { Asset, RootStackParamList } from '../types';
+import { ar, fieldsForCategory, labelForField } from '../i18n/ar';
+import { Asset, AssetCategory, RootStackParamList } from '../types';
 import {
   ALL_SHARE_FIELDS,
   ShareField,
@@ -35,6 +35,7 @@ type DetailRow = {
 };
 
 function sectionOf(field: keyof Asset): string {
+  if (field === 'parentId') return ar.sectionRelation;
   if (
     ['name', 'manufacturer', 'model', 'serialNumber', 'serviceTag'].includes(
       field
@@ -72,34 +73,6 @@ function sectionOf(field: keyof Asset): string {
   return ar.sectionLifecycle;
 }
 
-const DETAIL_FIELDS: (keyof Asset)[] = [
-  'name',
-  'manufacturer',
-  'model',
-  'serialNumber',
-  'serviceTag',
-  'cpu',
-  'ram',
-  'storage',
-  'networkPorts',
-  'firmware',
-  'osOrSystems',
-  'location',
-  'rack',
-  'department',
-  'role',
-  'status',
-  'managementIp',
-  'host',
-  'port',
-  'protocol',
-  'username',
-  'password',
-  'purchaseDate',
-  'warrantyExpiry',
-  'notes',
-];
-
 function displayValue(item: Asset, field: keyof Asset, showPassword: boolean): string {
   if (field === 'protocol') return ar.protocolLabels[item.protocol];
   if (field === 'status') return ar.statusLabels[item.status];
@@ -107,13 +80,31 @@ function displayValue(item: Asset, field: keyof Asset, showPassword: boolean): s
     if (!item.password) return '';
     return showPassword ? item.password : '••••••••';
   }
+  if (field === 'parentId') return '';
   return String(item[field] ?? '').trim();
+}
+
+function childAddActions(
+  category: AssetCategory
+): { label: string; childCategory: AssetCategory }[] {
+  if (category === 'servers') {
+    return [
+      { label: ar.addHypervisor, childCategory: 'hypervisor' },
+      { label: ar.addOs, childCategory: 'os' },
+    ];
+  }
+  if (category === 'hypervisor') {
+    return [{ label: ar.addVm, childCategory: 'vm' }];
+  }
+  return [];
 }
 
 export function DetailScreen({ navigation, route }: Props) {
   const { id } = route.params;
-  const { getById, deleteCredential } = useVault();
+  const { getById, getChildren, deleteCredential } = useVault();
   const item = getById(id);
+  const parent = item?.parentId ? getById(item.parentId) : undefined;
+  const children = item ? getChildren(item.id) : [];
   const [showPassword, setShowPassword] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [fields, setFields] = useState<Record<ShareField, boolean>>(
@@ -127,12 +118,12 @@ export function DetailScreen({ navigation, route }: Props) {
   const rows = useMemo((): DetailRow[] => {
     if (!item) return [];
     const out: DetailRow[] = [];
-    for (const field of DETAIL_FIELDS) {
+    for (const field of fieldsForCategory(item.category)) {
       const value = displayValue(item, field, showPassword);
       if (!value) continue;
       out.push({
         field,
-        label: labelForField(field),
+        label: labelForField(field, item.category),
         value,
         section: sectionOf(field),
         isPassword: field === 'password',
@@ -152,15 +143,29 @@ export function DetailScreen({ navigation, route }: Props) {
     );
   }
 
+  const addActions = childAddActions(item.category);
+
   const onDelete = () => {
+    if (children.length > 0) {
+      Alert.alert('', ar.cannotDeleteHasChildren);
+      return;
+    }
     Alert.alert(ar.delete, ar.confirmDelete, [
       { text: ar.no, style: 'cancel' },
       {
         text: ar.yes,
         style: 'destructive',
         onPress: async () => {
-          await deleteCredential(item.id);
-          navigation.goBack();
+          try {
+            await deleteCredential(item.id);
+            navigation.goBack();
+          } catch (e) {
+            if (e instanceof Error && e.message === 'HAS_CHILDREN') {
+              Alert.alert('', ar.cannotDeleteHasChildren);
+              return;
+            }
+            throw e;
+          }
         },
       },
     ]);
@@ -168,7 +173,11 @@ export function DetailScreen({ navigation, route }: Props) {
 
   const onShare = async () => {
     const selected = ALL_SHARE_FIELDS.filter((f) => fields[f]);
-    const message = formatCredentialMessage(item, selected);
+    const message = formatCredentialMessage(
+      item,
+      selected,
+      parent?.name
+    );
     setShareOpen(false);
     await shareViaWhatsApp(message);
   };
@@ -195,6 +204,20 @@ export function DetailScreen({ navigation, route }: Props) {
 
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.badge}>{ar.categoryLabels[item.category]}</Text>
+
+          {parent ? (
+            <Pressable
+              style={styles.parentCard}
+              onPress={() => navigation.navigate('Detail', { id: parent.id })}
+            >
+              <Text style={styles.section}>{ar.sectionRelation}</Text>
+              <Text style={styles.label}>{ar.parent}</Text>
+              <Text style={styles.parentName}>{parent.name}</Text>
+              <Text style={styles.parentMeta}>
+                {ar.categoryLabels[parent.category]}
+              </Text>
+            </Pressable>
+          ) : null}
 
           {rows.map((row) => {
             const showSection = row.section !== lastSection;
@@ -232,6 +255,39 @@ export function DetailScreen({ navigation, route }: Props) {
             );
           })}
 
+          {(children.length > 0 || addActions.length > 0) && (
+            <View style={styles.childrenBox}>
+              <Text style={styles.section}>{ar.children}</Text>
+              {children.map((child) => (
+                <Pressable
+                  key={child.id}
+                  style={styles.childRow}
+                  onPress={() =>
+                    navigation.navigate('Detail', { id: child.id })
+                  }
+                >
+                  <Text style={styles.childName}>{child.name}</Text>
+                  <Text style={styles.childMeta}>
+                    {ar.categoryLabels[child.category]}
+                    {child.host ? ` · ${child.host}` : ''}
+                  </Text>
+                </Pressable>
+              ))}
+              {addActions.map((action) => (
+                <GhostButton
+                  key={action.childCategory}
+                  label={action.label}
+                  onPress={() =>
+                    navigation.navigate('Form', {
+                      category: action.childCategory,
+                      parentId: item.id,
+                    })
+                  }
+                />
+              ))}
+            </View>
+          )}
+
           <View style={styles.actions}>
             <PrimaryButton
               label={ar.shareWhatsApp}
@@ -266,7 +322,9 @@ export function DetailScreen({ navigation, route }: Props) {
                       }}
                       thumbColor={fields[field] ? colors.accent : colors.textDim}
                     />
-                    <Text style={styles.switchLabel}>{labelForField(field)}</Text>
+                    <Text style={styles.switchLabel}>
+                      {labelForField(field, item.category)}
+                    </Text>
                   </View>
                 ))}
               </ScrollView>
@@ -317,6 +375,27 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     fontWeight: '700',
   },
+  parentCard: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  parentName: {
+    color: colors.accent,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  parentMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 2,
+  },
   section: {
     color: colors.accent,
     textAlign: 'right',
@@ -344,6 +423,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'right',
     writingDirection: 'rtl',
+  },
+  childrenBox: {
+    marginTop: spacing.sm,
+    gap: 10,
+  },
+  childRow: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  childName: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  childMeta: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'right',
+    marginTop: 4,
   },
   actions: { gap: 10, marginTop: spacing.lg },
   missing: {

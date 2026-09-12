@@ -23,8 +23,10 @@ interface VaultContextValue {
   lock: () => Promise<void>;
   addCredential: (data: Omit<Credential, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Credential>;
   updateCredential: (id: string, data: Partial<Credential>) => Promise<void>;
+  /** Throws `HAS_CHILDREN` if dependents exist */
   deleteCredential: (id: string) => Promise<void>;
   getById: (id: string) => Credential | undefined;
+  getChildren: (id: string) => Credential[];
   setBiometricsEnabled: (enabled: boolean) => Promise<void>;
   changePin: (oldPin: string, newPin: string) => Promise<void>;
 }
@@ -133,9 +135,17 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     [credentials, persist, sessionPin, settings]
   );
 
+  const getChildren = useCallback(
+    (id: string) => credentials.filter((c) => c.parentId === id),
+    [credentials]
+  );
+
   const deleteCredential = useCallback(
     async (id: string) => {
       if (!sessionPin || !settings) throw new Error('LOCKED');
+      if (credentials.some((c) => c.parentId === id)) {
+        throw new Error('HAS_CHILDREN');
+      }
       const next = credentials.filter((c) => c.id !== id);
       await persist(next, sessionPin, settings.salt);
     },
@@ -193,6 +203,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       updateCredential,
       deleteCredential,
       getById,
+      getChildren,
       setBiometricsEnabled,
       changePin,
     }),
@@ -210,6 +221,7 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
       updateCredential,
       deleteCredential,
       getById,
+      getChildren,
       setBiometricsEnabled,
       changePin,
     ]

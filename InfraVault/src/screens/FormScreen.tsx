@@ -14,6 +14,7 @@ import {
   ar,
   fieldsForCategory,
   labelForField,
+  parentPickerTitle,
   PROTOCOL_ORDER,
   STATUS_ORDER,
 } from '../i18n/ar';
@@ -21,7 +22,10 @@ import {
   Asset,
   AssetStatus,
   EMPTY_ASSET_FIELDS,
+  HYPERVISOR_VENDORS,
   MANUFACTURERS,
+  Protocol,
+  requiredParentCategory,
   RootStackParamList,
 } from '../types';
 import { colors, radii, spacing } from '../theme';
@@ -69,15 +73,25 @@ function sectionOf(field: keyof Asset): string {
 }
 
 export function FormScreen({ navigation, route }: Props) {
-  const { id, category: initialCategory } = route.params;
-  const { getById, addCredential, updateCredential } = useVault();
+  const { id, category: initialCategory, parentId: presetParent } = route.params;
+  const { getById, addCredential, updateCredential, credentials } = useVault();
   const existing = id ? getById(id) : undefined;
   const category = existing?.category ?? initialCategory ?? 'servers';
+  const parentCat = requiredParentCategory(category);
+
+  const parentOptions = useMemo(() => {
+    if (!parentCat) return [];
+    return credentials.filter((c) => c.category === parentCat);
+  }, [credentials, parentCat]);
+
+  const vendorList =
+    category === 'hypervisor' ? HYPERVISOR_VENDORS : MANUFACTURERS;
 
   const [form, setForm] = useState<FormData>({
     ...EMPTY_ASSET_FIELDS,
     category,
-    protocol: existing?.protocol ?? 'ssh',
+    parentId: existing?.parentId ?? presetParent ?? '',
+    protocol: existing?.protocol ?? (category === 'os' ? 'rdp' : 'ssh'),
     status: existing?.status ?? 'active',
     name: existing?.name ?? '',
     manufacturer: existing?.manufacturer ?? '',
@@ -105,11 +119,19 @@ export function FormScreen({ navigation, route }: Props) {
   });
   const [busy, setBusy] = useState(false);
 
-  const visibleFields = useMemo(() => fieldsForCategory(category), [category]);
-  const knownMfr = MANUFACTURERS.filter((m) => m !== 'Other');
+  const visibleFields = useMemo(
+    () => fieldsForCategory(category) as (keyof FormData)[],
+    [category]
+  );
+  const knownVendors = vendorList.filter((m) => m !== 'Other');
 
   const patch = <K extends keyof FormData>(key: K, value: FormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const formValue = (field: keyof FormData): string => {
+    const v = form[field];
+    return v == null ? '' : String(v);
   };
 
   const onSave = async () => {
@@ -117,11 +139,16 @@ export function FormScreen({ navigation, route }: Props) {
       Alert.alert('', ar.required);
       return;
     }
+    if (parentCat && !form.parentId) {
+      Alert.alert('', ar.parentRequired);
+      return;
+    }
     setBusy(true);
     try {
       const payload: FormData = {
         ...form,
         category,
+        parentId: parentCat ? form.parentId : '',
         name: form.name.trim(),
         manufacturer: form.manufacturer.trim(),
         model: form.model.trim(),
@@ -176,6 +203,41 @@ export function FormScreen({ navigation, route }: Props) {
           contentContainerStyle={styles.form}
           keyboardShouldPersistTaps="handled"
         >
+          {parentCat ? (
+            <View style={styles.parentBox}>
+              <Text style={styles.section}>{ar.sectionRelation}</Text>
+              <Text style={styles.fieldLabel}>
+                {parentPickerTitle(category)}
+              </Text>
+              {parentOptions.length === 0 ? (
+                <Text style={styles.warn}>{ar.noParentsAvailable}</Text>
+              ) : (
+                <View style={styles.chips}>
+                  {parentOptions.map((p) => (
+                    <Pressable
+                      key={p.id}
+                      onPress={() => patch('parentId', p.id)}
+                      style={[
+                        styles.chip,
+                        form.parentId === p.id && styles.chipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          form.parentId === p.id && styles.chipTextActive,
+                        ]}
+                      >
+                        {p.name}
+                        {p.host ? ` (${p.host})` : ''}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+          ) : null}
+
           {visibleFields.map((field) => {
             const section = sectionOf(field);
             const showSection = section !== lastSection;
@@ -183,15 +245,20 @@ export function FormScreen({ navigation, route }: Props) {
 
             if (field === 'manufacturer') {
               const isCustom =
-                !!form.manufacturer && !knownMfr.includes(form.manufacturer as typeof knownMfr[number]);
+                !!form.manufacturer &&
+                !knownVendors.includes(
+                  form.manufacturer as (typeof knownVendors)[number]
+                );
               return (
                 <View key={field}>
                   {showSection ? (
                     <Text style={styles.section}>{section}</Text>
                   ) : null}
-                  <Text style={styles.fieldLabel}>{ar.manufacturer}</Text>
+                  <Text style={styles.fieldLabel}>
+                    {labelForField('manufacturer', category)}
+                  </Text>
                   <View style={styles.chips}>
-                    {MANUFACTURERS.map((m) => {
+                    {vendorList.map((m) => {
                       const active =
                         m === 'Other'
                           ? !form.manufacturer || isCustom
@@ -218,7 +285,7 @@ export function FormScreen({ navigation, route }: Props) {
                   </View>
                   {(!form.manufacturer || isCustom) && (
                     <Field
-                      label="مصنّع آخر"
+                      label="أخرى / اكتب الاسم"
                       value={isCustom ? form.manufacturer : ''}
                       onChangeText={(v) => patch('manufacturer', v)}
                     />
@@ -238,7 +305,7 @@ export function FormScreen({ navigation, route }: Props) {
                     {PROTOCOL_ORDER.map((p) => (
                       <Pressable
                         key={p}
-                        onPress={() => patch('protocol', p)}
+                        onPress={() => patch('protocol', p as Protocol)}
                         style={[
                           styles.chip,
                           form.protocol === p && styles.chipActive,
@@ -292,16 +359,15 @@ export function FormScreen({ navigation, route }: Props) {
             }
 
             const multiline = field === 'notes' || field === 'osOrSystems';
-            const formKey = field as keyof FormData;
             return (
               <View key={field}>
                 {showSection ? (
                   <Text style={styles.section}>{section}</Text>
                 ) : null}
                 <Field
-                  label={labelForField(field)}
-                  value={String(form[formKey] ?? '')}
-                  onChangeText={(v) => patch(formKey, v as never)}
+                  label={labelForField(field, category)}
+                  value={formValue(field)}
+                  onChangeText={(v) => patch(field, v as never)}
                   secureTextEntry={field === 'password'}
                   autoCapitalize={
                     ['host', 'managementIp', 'username', 'password'].includes(
@@ -329,7 +395,11 @@ export function FormScreen({ navigation, route }: Props) {
           })}
 
           <View style={{ gap: 10, marginTop: spacing.md }}>
-            <PrimaryButton label={ar.save} onPress={onSave} disabled={busy} />
+            <PrimaryButton
+              label={ar.save}
+              onPress={onSave}
+              disabled={busy || (parentCat !== null && parentOptions.length === 0)}
+            />
             <GhostButton
               label={ar.cancel}
               onPress={() => navigation.goBack()}
@@ -363,6 +433,12 @@ const styles = StyleSheet.create({
   cat: { color: colors.accent, fontSize: 12, fontWeight: '600' },
   link: { color: colors.accent, fontWeight: '600' },
   form: { padding: spacing.md, paddingBottom: 48 },
+  parentBox: {
+    marginBottom: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   section: {
     color: colors.accent,
     textAlign: 'right',
@@ -376,6 +452,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     textAlign: 'right',
     fontSize: 13,
+  },
+  warn: {
+    color: colors.danger,
+    textAlign: 'right',
+    marginBottom: spacing.md,
+    lineHeight: 20,
   },
   chips: {
     flexDirection: 'row-reverse',

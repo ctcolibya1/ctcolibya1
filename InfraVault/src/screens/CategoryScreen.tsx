@@ -3,16 +3,77 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../context/VaultContext';
-import { ar } from '../i18n/ar';
-import { RootStackParamList } from '../types';
+import { ar, labelForField } from '../i18n/ar';
+import { Asset, AssetCategory, RootStackParamList } from '../types';
 import { categoryColors, colors, radii, spacing } from '../theme';
 import { Screen } from '../components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Category'>;
 
+function metaForItem(item: Asset): string {
+  switch (item.category) {
+    case 'servers':
+      return (
+        [item.serialNumber, item.manufacturer, item.model]
+          .filter(Boolean)
+          .join(' · ') ||
+        [item.host, item.managementIp].filter(Boolean).join(' · ') ||
+        ar.protocolLabels[item.protocol]
+      );
+    case 'hypervisor':
+      return (
+        [item.manufacturer, item.model, item.role]
+          .filter(Boolean)
+          .join(' · ') ||
+        item.host ||
+        ar.protocolLabels[item.protocol]
+      );
+    case 'vm':
+      return (
+        [item.osOrSystems, item.cpu && `${labelForField('cpu', 'vm')}: ${item.cpu}`, item.ram && `${labelForField('ram', 'vm')}: ${item.ram}`]
+          .filter(Boolean)
+          .join(' · ') ||
+        item.host ||
+        ar.statusLabels[item.status]
+      );
+    case 'os':
+      return (
+        [item.model, item.role, item.department]
+          .filter(Boolean)
+          .join(' · ') ||
+        item.host ||
+        ar.statusLabels[item.status]
+      );
+    default:
+      return (
+        [item.model, item.serialNumber, item.manufacturer]
+          .filter(Boolean)
+          .join(' · ') ||
+        [item.host, item.username].filter(Boolean).join(' · ') ||
+        ar.protocolLabels[item.protocol]
+      );
+  }
+}
+
+function parentSubtitle(
+  item: Asset,
+  getById: (id: string) => Asset | undefined
+): string | null {
+  if (!item.parentId) return null;
+  const parent = getById(item.parentId);
+  if (!parent) return null;
+  if (item.category === 'hypervisor' || item.category === 'os') {
+    return `${ar.onServer}: ${parent.name}`;
+  }
+  if (item.category === 'vm') {
+    return `${ar.onHypervisor}: ${parent.name}`;
+  }
+  return `على: ${parent.name}`;
+}
+
 export function CategoryScreen({ navigation, route }: Props) {
   const { category } = route.params;
-  const { credentials } = useVault();
+  const { credentials, getById } = useVault();
 
   const items = useMemo(
     () => credentials.filter((c) => c.category === category),
@@ -48,29 +109,33 @@ export function CategoryScreen({ navigation, route }: Props) {
               <Text style={styles.emptyHint}>{ar.emptyHint}</Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <Pressable
-              style={styles.row}
-              onPress={() => navigation.navigate('Detail', { id: item.id })}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.meta}>
-                  {[item.model, item.serialNumber, item.manufacturer]
-                    .filter(Boolean)
-                    .join(' · ') ||
-                    [item.host, item.username].filter(Boolean).join(' · ') ||
-                    ar.protocolLabels[item.protocol]}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.stripe,
-                  { backgroundColor: categoryColors[category] },
-                ]}
-              />
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const subtitle = parentSubtitle(item, getById);
+            return (
+              <Pressable
+                style={styles.row}
+                onPress={() => navigation.navigate('Detail', { id: item.id })}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>{item.name}</Text>
+                  {subtitle ? (
+                    <Text style={styles.parentLine}>{subtitle}</Text>
+                  ) : null}
+                  <Text style={styles.meta}>{metaForItem(item)}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.stripe,
+                    {
+                      backgroundColor:
+                        categoryColors[category as AssetCategory] ??
+                        colors.accent,
+                    },
+                  ]}
+                />
+              </Pressable>
+            );
+          }}
         />
       </SafeAreaView>
     </Screen>
@@ -130,6 +195,14 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     paddingTop: 14,
     paddingHorizontal: 14,
+  },
+  parentLine: {
+    color: colors.accent,
+    fontSize: 12,
+    textAlign: 'right',
+    paddingHorizontal: 14,
+    marginTop: 4,
+    fontWeight: '600',
   },
   meta: {
     color: colors.textMuted,

@@ -1,8 +1,8 @@
 export type AssetCategory =
   | 'servers'
-  | 'os'
   | 'hypervisor'
   | 'vm'
+  | 'os'
   | 'switches'
   | 'routers'
   | 'firewalls';
@@ -20,48 +20,39 @@ export type Protocol =
 
 export type AssetStatus = 'active' | 'standby' | 'maintenance' | 'retired';
 
-/** سجل معدة / عتاد بنية تحتية مع بيانات الدخول */
+/**
+ * العلاقات المنطقية:
+ * Server → Hypervisor → VM
+ * Server → OS
+ * Switches / Routers / Firewalls مستقلة
+ */
 export interface Asset {
   id: string;
   category: AssetCategory;
+  /** معرف الأب: خادم لـ Hypervisor/OS ، أو Hypervisor لـ VM */
+  parentId: string;
 
-  /** اسم الجهاز / Hostname */
   name: string;
-  /** الشركة المصنعة: Dell, HPE, Cisco... */
   manufacturer: string;
-  /** الموديل */
   model: string;
-  /** الرقم التسلسلي */
   serialNumber: string;
-  /** Service Tag */
   serviceTag: string;
 
-  /** المعالج */
   cpu: string;
-  /** الذاكرة */
   ram: string;
-  /** التخزين */
   storage: string;
-  /** عدد/نوع المنافذ الشبكية */
   networkPorts: string;
-  /** البرنامج الثابت / Firmware */
   firmware: string;
-  /** الأنظمة والتطبيقات الموجودة على المعدة */
+  /** نظام الضيف / الأنظمة المثبتة */
   osOrSystems: string;
 
-  /** أين يعمل: مركز بيانات / موقع */
   location: string;
-  /** الرف / الوحدة */
   rack: string;
-  /** الإدارة / القسم */
   department: string;
-  /** دور المعدة في البنية */
   role: string;
   status: AssetStatus;
 
-  /** IP الإدارة */
   managementIp: string;
-  /** عنوان / IP للوصول */
   host: string;
   port: string;
   protocol: Protocol;
@@ -76,7 +67,6 @@ export interface Asset {
   updatedAt: string;
 }
 
-/** توافق خلفي مع الاسم القديم */
 export type Credential = Asset;
 
 export interface VaultSettings {
@@ -92,7 +82,7 @@ export type RootStackParamList = {
   Home: undefined;
   Category: { category: AssetCategory };
   Detail: { id: string };
-  Form: { category?: AssetCategory; id?: string };
+  Form: { category?: AssetCategory; id?: string; parentId?: string };
   Settings: undefined;
   Report: undefined;
 };
@@ -108,14 +98,26 @@ export const MANUFACTURERS = [
   'Huawei',
   'Lenovo',
   'Supermicro',
-  'VMware',
-  'Microsoft',
   'IBM',
   'Oracle',
   'Other',
 ] as const;
 
-export const EMPTY_ASSET_FIELDS: Omit<Asset, 'id' | 'category' | 'createdAt' | 'updatedAt' | 'protocol' | 'status'> = {
+export const HYPERVISOR_VENDORS = [
+  'VMware',
+  'Microsoft',
+  'Proxmox',
+  'Citrix',
+  'Red Hat',
+  'Oracle',
+  'Other',
+] as const;
+
+export const EMPTY_ASSET_FIELDS: Omit<
+  Asset,
+  'id' | 'category' | 'createdAt' | 'updatedAt' | 'protocol' | 'status'
+> = {
+  parentId: '',
   name: '',
   manufacturer: '',
   model: '',
@@ -141,6 +143,21 @@ export const EMPTY_ASSET_FIELDS: Omit<Asset, 'id' | 'category' | 'createdAt' | '
   notes: '',
 };
 
+/** من يجب اختياره كأب لهذا التصنيف */
+export function requiredParentCategory(
+  category: AssetCategory
+): AssetCategory | null {
+  switch (category) {
+    case 'hypervisor':
+    case 'os':
+      return 'servers';
+    case 'vm':
+      return 'hypervisor';
+    default:
+      return null;
+  }
+}
+
 export function normalizeAsset(
   raw: Partial<Asset> & { id: string; category: AssetCategory } & {
     osOrFirmware?: string;
@@ -149,6 +166,7 @@ export function normalizeAsset(
   return {
     id: raw.id,
     category: raw.category,
+    parentId: raw.parentId ?? '',
     name: raw.name ?? '',
     manufacturer: raw.manufacturer ?? '',
     model: raw.model ?? '',

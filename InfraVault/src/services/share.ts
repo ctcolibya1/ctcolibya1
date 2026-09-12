@@ -91,14 +91,19 @@ function fieldValue(credential: Credential, field: ShareField): string {
 
 export function formatCredentialMessage(
   credential: Credential,
-  fields: ShareField[] = ALL_SHARE_FIELDS
+  fields: ShareField[] = ALL_SHARE_FIELDS,
+  parentName?: string
 ): string {
   const lines: string[] = [`🔐 ${ar.appName}`, ''];
+
+  if (parentName) {
+    lines.push(`${ar.parent}: ${parentName}`);
+  }
 
   for (const field of fields) {
     const value = fieldValue(credential, field);
     if (!value) continue;
-    lines.push(`${labelForField(field)}: ${value}`);
+    lines.push(`${labelForField(field, credential.category)}: ${value}`);
   }
 
   lines.push('');

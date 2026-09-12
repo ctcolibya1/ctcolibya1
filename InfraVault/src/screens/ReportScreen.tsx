@@ -9,8 +9,8 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVault } from '../context/VaultContext';
-import { ar, CATEGORY_ORDER, labelForField } from '../i18n/ar';
-import { Asset, RootStackParamList } from '../types';
+import { ar, CATEGORY_ORDER, fieldsForCategory, labelForField } from '../i18n/ar';
+import { Asset, AssetCategory, RootStackParamList } from '../types';
 import {
   buildFeasibilityReport,
   categoryStats,
@@ -22,43 +22,43 @@ import { GhostButton, PrimaryButton, Screen } from '../components/ui';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Report'>;
 
-const LIST_FIELDS: (keyof Asset)[] = [
-  'manufacturer',
-  'model',
-  'serialNumber',
-  'serviceTag',
-  'cpu',
-  'ram',
-  'storage',
-  'networkPorts',
-  'firmware',
-  'osOrSystems',
-  'location',
-  'rack',
-  'department',
-  'role',
-  'status',
-  'managementIp',
-  'host',
-  'port',
-  'protocol',
-  'username',
-  'purchaseDate',
-  'warrantyExpiry',
-  'notes',
-];
-
 function filledLines(asset: Asset): string[] {
   const lines: string[] = [];
-  for (const field of LIST_FIELDS) {
+  for (const field of fieldsForCategory(asset.category)) {
     let val = '';
     if (field === 'protocol') val = ar.protocolLabels[asset.protocol];
     else if (field === 'status') val = ar.statusLabels[asset.status];
+    else if (field === 'password') continue;
     else val = String(asset[field] ?? '').trim();
     if (!val) continue;
-    lines.push(`${labelForField(field)}: ${val}`);
+    lines.push(`${labelForField(field, asset.category)}: ${val}`);
   }
   return lines;
+}
+
+function AssetCard({
+  asset,
+  depth = 0,
+}: {
+  asset: Asset;
+  depth?: number;
+}) {
+  const score = completenessScore(asset);
+  const lines = filledLines(asset);
+  return (
+    <View style={[styles.assetCard, depth > 0 && { marginRight: depth * 12 }]}>
+      <View style={styles.assetHead}>
+        <Text style={styles.assetName}>{asset.name}</Text>
+        <Text style={styles.pct}>{score.pct}%</Text>
+      </View>
+      <Text style={styles.assetCat}>{ar.categoryLabels[asset.category]}</Text>
+      {lines.map((line) => (
+        <Text key={line} style={styles.assetLine}>
+          {line}
+        </Text>
+      ))}
+    </View>
+  );
 }
 
 export function ReportScreen({ navigation }: Props) {
@@ -71,6 +71,15 @@ export function ReportScreen({ navigation }: Props) {
         credentials.length
     );
   }, [credentials]);
+
+  const servers = useMemo(
+    () => credentials.filter((c) => c.category === 'servers'),
+    [credentials]
+  );
+  const networkCats: AssetCategory[] = ['switches', 'routers', 'firewalls'];
+
+  const childrenOf = (id: string) =>
+    credentials.filter((c) => c.parentId === id);
 
   const onShare = async () => {
     const message = buildFeasibilityReport(credentials);
@@ -117,32 +126,52 @@ export function ReportScreen({ navigation }: Props) {
                 </View>
               ))}
 
-              <Text style={styles.section}>تفاصيل المعدات</Text>
-              {CATEGORY_ORDER.map((cat) => {
+              <Text style={styles.section}>تفاصيل هرمية حسب الخوادم</Text>
+              {servers.length === 0 ? (
+                <Text style={styles.emptyInline}>— لا توجد خوادم —</Text>
+              ) : (
+                servers.map((server) => {
+                  const hypervisors = childrenOf(server.id).filter(
+                    (c) => c.category === 'hypervisor'
+                  );
+                  const osList = childrenOf(server.id).filter(
+                    (c) => c.category === 'os'
+                  );
+                  return (
+                    <View key={server.id} style={styles.catBlock}>
+                      <AssetCard asset={server} />
+                      {hypervisors.map((hv) => {
+                        const vms = childrenOf(hv.id).filter(
+                          (c) => c.category === 'vm'
+                        );
+                        return (
+                          <View key={hv.id}>
+                            <AssetCard asset={hv} depth={1} />
+                            {vms.map((vm) => (
+                              <AssetCard key={vm.id} asset={vm} depth={2} />
+                            ))}
+                          </View>
+                        );
+                      })}
+                      {osList.map((os) => (
+                        <AssetCard key={os.id} asset={os} depth={1} />
+                      ))}
+                    </View>
+                  );
+                })
+              )}
+
+              {networkCats.map((cat) => {
                 const items = credentials.filter((c) => c.category === cat);
                 if (items.length === 0) return null;
                 return (
-                  <View key={`detail-${cat}`} style={styles.catBlock}>
+                  <View key={`net-${cat}`} style={styles.catBlock}>
                     <Text style={styles.catBlockTitle}>
                       {ar.categoryLabels[cat]} ({items.length})
                     </Text>
-                    {items.map((asset) => {
-                      const score = completenessScore(asset);
-                      const lines = filledLines(asset);
-                      return (
-                        <View key={asset.id} style={styles.assetCard}>
-                          <View style={styles.assetHead}>
-                            <Text style={styles.assetName}>{asset.name}</Text>
-                            <Text style={styles.pct}>{score.pct}%</Text>
-                          </View>
-                          {lines.map((line) => (
-                            <Text key={line} style={styles.assetLine}>
-                              {line}
-                            </Text>
-                          ))}
-                        </View>
-                      );
-                    })}
+                    {items.map((asset) => (
+                      <AssetCard key={asset.id} asset={asset} />
+                    ))}
                   </View>
                 );
               })}
@@ -196,6 +225,11 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: 48,
+  },
+  emptyInline: {
+    color: colors.textMuted,
+    textAlign: 'right',
+    marginBottom: spacing.md,
   },
   summary: {
     flexDirection: 'row-reverse',
@@ -258,7 +292,7 @@ const styles = StyleSheet.create({
   assetHead: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   assetName: {
     color: colors.text,
@@ -266,6 +300,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     flex: 1,
     textAlign: 'right',
+  },
+  assetCat: {
+    color: colors.accent,
+    fontSize: 12,
+    textAlign: 'right',
+    marginBottom: 8,
+    fontWeight: '600',
   },
   pct: { color: colors.accent, fontWeight: '700', marginLeft: 8 },
   assetLine: {

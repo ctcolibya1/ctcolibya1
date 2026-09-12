@@ -1,18 +1,24 @@
-import { Asset, AssetCategory, AssetStatus, Protocol } from '../types';
+import {
+  Asset,
+  AssetCategory,
+  AssetStatus,
+  Protocol,
+  requiredParentCategory,
+} from '../types';
 
 export const ar = {
   appName: 'خزنة البنية',
-  appTagline: 'جرد المعدات وكلمات السر في مكان واحد',
+  appTagline: 'خادم ← Hypervisor ← VM · وأنظمة التشغيل على الخوادم',
   unlock: 'فتح الخزنة',
   enterPin: 'أدخل رمز PIN',
   confirmPin: 'أكد رمز PIN',
   setupTitle: 'إعداد الحماية',
-  setupSubtitle: 'اختر رمز PIN من 4 إلى 8 أرقام لحماية بيانات المعدات',
+  setupSubtitle: 'اختر رمز PIN من 4 إلى 8 أرقام',
   wrongPin: 'رمز PIN غير صحيح',
   pinMismatch: 'الرمزان غير متطابقين',
   useBiometrics: 'فتح ببصمة الوجه / الإصبع',
-  categories: 'تصنيفات المعدات',
-  search: 'بحث بالاسم أو الموديل أو Serial أو IP…',
+  categories: 'التصنيفات',
+  search: 'بحث بالاسم أو Serial أو IP…',
   add: 'إضافة',
   save: 'حفظ',
   delete: 'حذف',
@@ -21,84 +27,106 @@ export const ar = {
   shareWhatsApp: 'مشاركة عبر واتساب',
   copyPassword: 'نسخ كلمة السر',
   copied: 'تم النسخ',
-  emptyCategory: 'لا توجد معدات في هذا التصنيف بعد',
-  emptyHint: 'اضغط + لإضافة معدة مع مواصفاتها الكاملة',
+  emptyCategory: 'لا توجد سجلات بعد',
+  emptyHint: 'اضغط + — للعناصر التابعة اختر الأب أولاً',
   settings: 'الإعدادات',
   biometrics: 'البصمة الحيوية',
   changePin: 'تغيير رمز PIN',
-  lockNow: 'قفل الخزنة الآن',
+  lockNow: 'قفل الآن',
   about: 'عن التطبيق',
   aboutText:
-    'خزنة البنية تطبيق محلي لجرد معدات البنية التحتية (خوادم، شبكات، افتراضية) مع مواصفاتها الفنية وبيانات الدخول. البيانات تُشفَّر على جهازك.',
-  required: 'الاسم مطلوب على الأقل',
+    'جرد البنية بعلاقات منطقية: الخادم يحمل Hypervisor والـ VMs، وأنظمة التشغيل ترتبط بالخادم. كل نوع له حقول مفيدة فقط.',
+  required: 'الاسم مطلوب',
+  parentRequired: 'يجب اختيار العنصر الأب',
+  noParentsAvailable: 'لا يوجد أب مناسب — أضف خادماً أو Hypervisor أولاً',
   confirmDelete: 'حذف هذا السجل نهائياً؟',
+  cannotDeleteHasChildren:
+    'لا يمكن الحذف: توجد عناصر تابعة. احذف الأبناء أولاً.',
   yes: 'نعم',
   no: 'لا',
   noResults: 'لا توجد نتائج',
-  count: 'معدة',
-  newEntry: 'معدة جديدة',
-  editEntry: 'تعديل المعدة',
+  count: 'سجل',
+  newEntry: 'سجل جديد',
+  editEntry: 'تعديل السجل',
   selectFieldsToShare: 'اختر الحقول للمشاركة',
   share: 'مشاركة',
   allFields: 'كل الحقول',
   hidePassword: 'إخفاء',
   showPassword: 'إظهار',
   report: 'تقرير الجدوى',
-  reportTitle: 'تقرير جرد وجدوى المعدات',
-  reportSubtitle: 'ملخص كل المدخلات المسجّلة حسب التصنيف',
-  reportEmpty: 'لا توجد معدات بعد لإنشاء التقرير',
+  reportTitle: 'تقرير جرد وجدوى البنية',
+  reportSubtitle: 'عرض هرمي حسب الخوادم والعلاقات',
+  reportEmpty: 'لا توجد بيانات بعد',
   reportShare: 'مشاركة التقرير',
   reportGeneratedAt: 'تاريخ التقرير',
-  totalAssets: 'إجمالي المعدات',
-  sectionIdentity: 'هوية المعدة',
-  sectionSpecs: 'المواصفات الفنية',
-  sectionOps: 'التشغيل والموقع',
-  sectionAccess: 'الوصول وبيانات الدخول',
+  totalAssets: 'إجمالي السجلات',
+  sectionRelation: 'الارتباط',
+  sectionIdentity: 'الهوية',
+  sectionSpecs: 'المواصفات',
+  sectionOps: 'التشغيل',
+  sectionAccess: 'الوصول',
   sectionLifecycle: 'دورة الحياة',
+  parent: 'مرتبط بـ',
+  selectParent: 'اختر العنصر الأب',
+  children: 'العناصر التابعة',
+  addHypervisor: 'إضافة Hypervisor',
+  addVm: 'إضافة VM',
+  addOs: 'إضافة نظام تشغيل',
+  onServer: 'على الخادم',
+  onHypervisor: 'على Hypervisor',
 
-  name: 'اسم الجهاز / Hostname',
+  name: 'الاسم',
   manufacturer: 'الشركة المصنعة',
-  model: 'الموديل (Model)',
-  serialNumber: 'الرقم التسلسلي (Serial Number)',
+  model: 'الموديل',
+  serialNumber: 'الرقم التسلسلي (Serial)',
   serviceTag: 'Service Tag',
   cpu: 'المعالج (CPU)',
   ram: 'الذاكرة (RAM)',
-  storage: 'التخزين (Storage)',
+  storage: 'التخزين',
   networkPorts: 'المنافذ الشبكية',
-  firmware: 'Firmware / البرنامج الثابت',
-  osOrSystems: 'الأنظمة والتطبيقات الموجودة',
-  location: 'أين يعمل / الموقع / مركز البيانات',
-  rack: 'الرف / Rack / U',
-  department: 'القسم / الإدارة',
-  role: 'دور المعدة في البنية',
+  firmware: 'Firmware',
+  osOrSystems: 'نظام التشغيل / الأنظمة',
+  location: 'الموقع / مركز البيانات',
+  rack: 'الرف / Rack',
+  department: 'القسم',
+  role: 'الدور',
   status: 'الحالة',
-  managementIp: 'IP الإدارة (Management)',
+  managementIp: 'IP الإدارة',
   host: 'عنوان الوصول / IP',
   port: 'المنفذ',
   username: 'اسم المستخدم',
   password: 'كلمة السر',
-  protocol: 'بروتوكول الوصول',
+  protocol: 'البروتوكول',
   purchaseDate: 'تاريخ الشراء',
   warrantyExpiry: 'انتهاء الضمان',
-  notes: 'ملاحظات إضافية',
+  notes: 'ملاحظات',
+
+  hypervisorVendor: 'منصة الافتراضية',
+  hypervisorVersion: 'إصدار Hypervisor',
+  vCpu: 'vCPU',
+  vRam: 'vRAM',
+  vDisk: 'قرص افتراضي',
+  guestOs: 'نظام تشغيل الضيف',
+  osName: 'اسم نظام التشغيل',
+  osEdition: 'الإصدار / Edition',
 
   categoryLabels: {
-    servers: 'خوادم',
-    os: 'أنظمة التشغيل',
+    servers: 'خوادم فعلية',
     hypervisor: 'Hypervisor',
-    vm: 'آلات افتراضية',
+    vm: 'آلات افتراضية (VM)',
+    os: 'أنظمة التشغيل',
     switches: 'محولات',
     routers: 'موجهات',
     firewalls: 'جدران نارية',
   } as Record<AssetCategory, string>,
   categoryHints: {
-    servers: 'Dell / HPE — Serial, CPU, RAM, Storage',
-    os: 'حسابات وأنظمة على المعدات',
-    hypervisor: 'VMware / Hyper-V / Proxmox',
-    vm: 'ضيوف افتراضيون ومواصفاتهم',
-    switches: 'محولات الشبكة والمنافذ',
-    routers: 'أجهزة التوجيه',
-    firewalls: 'جدران الحماية',
+    servers: 'عتاد فعلي: Serial · CPU · RAM · Storage',
+    hypervisor: 'يُثبت على خادم ويدر الـ VMs',
+    vm: 'تتبع Hypervisor — مواصفات افتراضية فقط',
+    os: 'مرتبط بخادم فعلي',
+    switches: 'عتاد شبكة',
+    routers: 'أجهزة توجيه',
+    firewalls: 'جدران حماية',
   } as Record<AssetCategory, string>,
   protocolLabels: {
     ssh: 'SSH',
@@ -121,9 +149,9 @@ export const ar = {
 
 export const CATEGORY_ORDER: AssetCategory[] = [
   'servers',
-  'os',
   'hypervisor',
   'vm',
+  'os',
   'switches',
   'routers',
   'firewalls',
@@ -148,39 +176,9 @@ export const STATUS_ORDER: AssetStatus[] = [
   'retired',
 ];
 
-/** الحقول الظاهرة في النموذج حسب نوع المعدة */
+/** حقول مفيدة فقط — بدون بيانات عشوائية */
 export function fieldsForCategory(category: AssetCategory): (keyof Asset)[] {
-  const commonIdentity: (keyof Asset)[] = [
-    'name',
-    'manufacturer',
-    'model',
-    'serialNumber',
-    'serviceTag',
-  ];
-  const computeSpecs: (keyof Asset)[] = [
-    'cpu',
-    'ram',
-    'storage',
-    'networkPorts',
-    'firmware',
-    'osOrSystems',
-  ];
-  const netSpecs: (keyof Asset)[] = [
-    'networkPorts',
-    'firmware',
-    'osOrSystems',
-    'cpu',
-    'ram',
-    'storage',
-  ];
-  const ops: (keyof Asset)[] = [
-    'location',
-    'rack',
-    'department',
-    'role',
-    'status',
-  ];
-  const access: (keyof Asset)[] = [
+  const accessFull: (keyof Asset)[] = [
     'managementIp',
     'host',
     'port',
@@ -188,57 +186,115 @@ export function fieldsForCategory(category: AssetCategory): (keyof Asset)[] {
     'username',
     'password',
   ];
-  const life: (keyof Asset)[] = ['purchaseDate', 'warrantyExpiry', 'notes'];
+  const accessSimple: (keyof Asset)[] = [
+    'host',
+    'port',
+    'protocol',
+    'username',
+    'password',
+  ];
 
   switch (category) {
     case 'servers':
-    case 'hypervisor':
-      return [...commonIdentity, ...computeSpecs, ...ops, ...access, ...life];
-    case 'vm':
       return [
         'name',
         'manufacturer',
         'model',
+        'serialNumber',
+        'serviceTag',
         'cpu',
         'ram',
         'storage',
-        'osOrSystems',
+        'networkPorts',
+        'firmware',
         'location',
+        'rack',
         'department',
         'role',
         'status',
-        'host',
-        'port',
-        'protocol',
-        'username',
-        'password',
+        ...accessFull,
+        'purchaseDate',
+        'warrantyExpiry',
+        'notes',
+      ];
+    case 'hypervisor':
+      // بدون تكرار عتاد الخادم
+      return [
+        'name',
+        'manufacturer',
+        'model',
+        'role',
+        'status',
+        ...accessFull,
+        'notes',
+      ];
+    case 'vm':
+      return [
+        'name',
+        'osOrSystems',
+        'cpu',
+        'ram',
+        'storage',
+        'role',
+        'department',
+        'status',
+        ...accessSimple,
         'notes',
       ];
     case 'os':
       return [
         'name',
-        'osOrSystems',
+        'model',
         'role',
-        'location',
         'department',
         'status',
-        'host',
-        'port',
-        'protocol',
-        'username',
-        'password',
+        ...accessSimple,
         'notes',
       ];
     case 'switches':
     case 'routers':
     case 'firewalls':
-      return [...commonIdentity, ...netSpecs, ...ops, ...access, ...life];
+      return [
+        'name',
+        'manufacturer',
+        'model',
+        'serialNumber',
+        'serviceTag',
+        'networkPorts',
+        'firmware',
+        'location',
+        'rack',
+        'department',
+        'role',
+        'status',
+        ...accessFull,
+        'purchaseDate',
+        'warrantyExpiry',
+        'notes',
+      ];
     default:
-      return [...commonIdentity, ...computeSpecs, ...ops, ...access, ...life];
+      return ['name', 'status', 'notes'];
   }
 }
 
-export function labelForField(field: keyof Asset): string {
+export function labelForField(
+  field: keyof Asset,
+  category?: AssetCategory
+): string {
+  if (category === 'hypervisor') {
+    if (field === 'manufacturer') return ar.hypervisorVendor;
+    if (field === 'model') return ar.hypervisorVersion;
+  }
+  if (category === 'vm') {
+    if (field === 'cpu') return ar.vCpu;
+    if (field === 'ram') return ar.vRam;
+    if (field === 'storage') return ar.vDisk;
+    if (field === 'osOrSystems') return ar.guestOs;
+  }
+  if (category === 'os') {
+    if (field === 'name') return ar.osName;
+    if (field === 'model') return ar.osEdition;
+  }
   const map: Partial<Record<keyof Asset, string>> = {
     name: ar.name,
     manufacturer: ar.manufacturer,
@@ -265,6 +321,15 @@ export function labelForField(field: keyof Asset): string {
     purchaseDate: ar.purchaseDate,
     warrantyExpiry: ar.warrantyExpiry,
     notes: ar.notes,
+    parentId: ar.parent,
   };
   return map[field] ?? String(field);
+}
+
+export function parentPickerTitle(category: AssetCategory): string {
+  const p = requiredParentCategory(category);
+  if (p === 'servers') return `${ar.selectParent} (${ar.categoryLabels.servers})`;
+  if (p === 'hypervisor')
+    return `${ar.selectParent} (${ar.categoryLabels.hypervisor})`;
+  return ar.selectParent;
 }

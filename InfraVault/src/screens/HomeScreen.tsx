@@ -38,6 +38,10 @@ export function HomeScreen({ navigation }: Props) {
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
+    const parentName = (c: (typeof credentials)[number]) => {
+      if (!c.parentId) return '';
+      return credentials.find((p) => p.id === c.parentId)?.name ?? '';
+    };
     return credentials.filter((c) =>
       [
         c.name,
@@ -51,6 +55,8 @@ export function HomeScreen({ navigation }: Props) {
         c.username,
         c.location,
         c.notes,
+        c.osOrSystems,
+        parentName(c),
       ]
         .join(' ')
         .toLowerCase()
