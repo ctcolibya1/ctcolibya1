@@ -21,39 +21,54 @@
 - مشاركة سجل كامل أو حقول محددة عبر واتساب
 - واجهة عربية (RTL)
 
-## التشغيل على iPhone
+## التثبيت على iPhone 16 Pro Max (iOS 26+)
 
-### الطريقة الأسهل (Expo Go)
+لا يمكن تثبيت التطبيق على جهازك من السحابة مباشرة. اختر أحد المسارات التالية على جهازك/ماك.
 
-1. ثبّت [Expo Go](https://apps.apple.com/app/expo-go/id982107779) على الآيفون
-2. من جهاز Mac أو الكمبيوتر:
+### أ) تجربة سريعة عبر Expo Go (دقائق)
+
+المشروع على **Expo SDK 57**.
+
+1. على الآيفون ثبّت نسخة Expo Go المتوافقة مع SDK 57 من:  
+   https://expo.dev/go  
+   (نسخة App Store قد تكون SDK أقدم ولا تفتح المشروع)
+2. من كمبيوتر على نفس الشبكة أو مع Tunnel:
 
 ```bash
 cd InfraVault
 npm install
-npx expo start
+npx expo start --tunnel
 ```
 
-3. امسح رمز QR بكاميرا الآيفون
+3. امسح QR من كاميرا الآيفون أو من داخل Expo Go.
 
-### بناء تطبيق مستقل (TestFlight / App Store)
+### ب) تثبيت كتطبيق حقيقي على الجهاز (موصى به)
 
-تحتاج Mac مع Xcode:
+تحتاج عضوية **Apple Developer Program** ($99/سنة):
+
+```bash
+cd InfraVault
+npm install
+npm install -g eas-cli
+eas login
+eas build:configure
+eas build --platform ios --profile preview
+```
+
+بعد انتهاء البناء:
+- ثبّت عبر الرابط الذي يعطيه EAS (Internal distribution)، أو
+- ارفع لـ TestFlight: `eas submit --platform ios`
+
+### ج) من Mac بكابل USB
 
 ```bash
 cd InfraVault
 npm install
 npx expo prebuild --platform ios
-npx expo run:ios
+npx expo run:ios --device
 ```
 
-أو عبر EAS Build:
-
-```bash
-npm install -g eas-cli
-eas login
-eas build --platform ios
-```
+اختر iPhone 16 Pro Max من قائمة الأجهزة، ووقّع بـ Apple ID في Xcode → Signing & Capabilities.
 
 ## الأمان
 
